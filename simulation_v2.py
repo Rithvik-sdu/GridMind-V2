@@ -3,26 +3,56 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 
-#Identify Variables
-baseline_demand_w = 4680
-battery_capacity_wh = 2048  # 5 × 409.6Wh LiFePO4 units
-battery_soc = 100
-solar_max_output_w = 10000
-grid_price_per_kwh = 0.12
-grid_max_output_w = 20000
-forecast_demand_w = 0
+#Identify Demand Variables
+baseline_demand_w = 23400
+spike_demand_w = 42150
+idle_demand_w = 9300
 
-#Algorithm parameters
-MAX_BATTERY_DISCHARGE_W = 3200  # 5 × 640W continuous discharge
+#Identify Battery Variables
+battery_capacity_wh = 10240
+max_battery_discharge_w = 16000
+battery_tank_wh = 10240
 
-#Key Metrics
-battery_soc_list = []
-grid_contribution_list = []
-solar_output_list = []
-demand_list = []
-mode_list = []
-battery_setpoints = []
+#Identify Grid Variables
+grid_cap_w = 33500
 
-#Simulation parameters
-TIME_STEP_SECONDS = 1
-SIM_DURATION_SECONDS = 3600
+#Identify Solar Variables
+solar_fraction = 0.10
+
+#Identify Controller Variables
+alpha = 7.5
+beta_battery = 95
+w1 = 1
+w3 = 1
+
+#Identify Time Variables
+dt = 1
+sim_duration = 3600
+
+#Identify Logging Lists
+demand_log = []
+solar_log = []
+battery_output_log = []
+grid_output_log = []
+beta_log = []
+tank_log = []
+unmet_demand_log = []
+curtailment_log = []
+solar_used_log = []
+timestamp_log = []
+C_log = []
+
+#generate demand traces
+def demand_trace(scenario, d_log):
+    if scenario == '1':
+        for sec in range(0, 200):
+            d_log.append(np.random.normal(idle_demand_w, 186))
+        for sec in range(200, 1200):
+            d_log.append(np.random.normal(baseline_demand_w, 468))
+        for sec in range(1200, 1600):
+            d_log.append(np.random.normal(spike_demand_w, 843))
+        for sec in range(1600, 3000):
+            d_log.append(np.random.normal(baseline_demand_w, 468))
+        for sec in range(3000, 3600):
+            d_log.append(np.random.normal(idle_demand_w, 186))
+
