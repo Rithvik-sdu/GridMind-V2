@@ -1,29 +1,6 @@
-#Import packages
-import numpy as np
+#Import modules
+from grid_mind_env import *
 import matplotlib.pyplot as plt
-import pandas as pd
-import math as mt
-
-np.random.seed(42)
-
-#Identify Demand Variables
-baseline_demand_w = 23400
-spike_demand_w = 42150
-idle_demand_w = 9300
-
-#Identify Battery Variables
-battery_capacity_wh = 10240
-max_battery_discharge_w = 16000
-max_battery_charge_w = 10240
-battery_tank_wh = 10240
-
-#Identify Grid Variables
-grid_cap_w = 53000
-last_grid_output = 0
-max_jump = 53000
-
-#Identify Solar Variables
-solar_fraction = 0.10
 
 #Identify Controller Variables
 decay = 0.51
@@ -34,10 +11,6 @@ w1 = 1
 w2 = 1
 x1 = 0
 x2 = 0
-
-#Identify Time Variables
-dt = 0.1
-sim_duration = 864000
 
 #Identify Logging Lists
 demand_log = []
@@ -53,73 +26,11 @@ timestamp_log = []
 C_log = []
 grid_ramp_log = []
 
-#generate demand traces
-def demand_trace(d_log):
-    rand_hertz = np.random.uniform(0.2, 3.0)
-    period = int(1/(rand_hertz * dt))
-    quarter = max(2, period//4)
-    d_log.append(np.random.normal(idle_demand_w, 186))
-
-    idle_baseline = np.linspace(idle_demand_w, baseline_demand_w, 10)
-    idle_baseline = idle_baseline + np.random.normal(0, 468, 10)
-    d_log.extend(idle_baseline)
-
-    while len(d_log) < 864000:
-
-        ramp_up = np.linspace(baseline_demand_w, spike_demand_w, quarter)
-        ramp_up = ramp_up + np.random.normal(0, 843, quarter)
-        d_log.extend(ramp_up)
-
-        d_log.extend(np.random.normal(spike_demand_w, 843, quarter))
-
-        ramp_down = np.linspace(spike_demand_w,baseline_demand_w, quarter)
-        ramp_down = ramp_down + np.random.normal(0, 843, quarter)
-        d_log.extend(ramp_down)
-
-        d_log.extend(np.random.normal(baseline_demand_w, 468, quarter))
-
-    baseline_idle = np.linspace(baseline_demand_w, idle_demand_w, 10)
-    baseline_idle = baseline_idle + np.random.normal(0, 468, 10)
-    d_log.extend(baseline_idle)
-
 demand_trace(demand_log)
 # plt.plot(demand_log[:300])
 # plt.xlabel("Time (s)")
 # plt.ylabel("Power (W)") 
 # plt.show()
-
-def extract_solar(file_path, target_length, column_name):
-    df = pd.read_csv(file_path)
-    solar = pd.to_numeric(df[column_name], errors='coerce')
-
-    solar = solar.fillna(0)
-    solar = solar.clip(lower=0)      
-
-    peak = solar.max()
-    scale = ((solar_fraction * spike_demand_w)/peak)
-    solar *= scale
-
-    repeat_factor = mt.ceil(target_length / len(solar))
-    solar = np.repeat(solar, repeat_factor)
-    solar = solar[:target_length]
-
-    return solar.tolist()
-
-
-csv_file_one = "/Users/uthangavelu/Downloads/system_10__date_2015_06_17.csv" #Golden, Colorado
-ac_power_name_one = 'ac_power__423'
-
-csv_file_two = "/Users/uthangavelu/Downloads/system_1423__date_2023_02_28.csv" #Clark County, Nevada
-ac_power_name_two = 'inv1_ac_power__4854'
-
-csv_file_three = "/Users/uthangavelu/Downloads/system_1403__date_2020_06_02.csv" #Cocoa Beach, Florida
-ac_power_name_three = 'ac_power__5034'
-
-csv_file_four = "/Users/uthangavelu/Downloads/system_1422__date_2017_05_17.csv"
-ac_power_name_four = 'inv1_ac_power__4830' #Burlington, Vermont
-
-csv_file_five = "/Users/uthangavelu/Downloads/system_1429__date_2017_07_16.csv" #Alberquerque, New Mexico
-ac_power_name_five = 'inv1_ac_power__4917'
 
 solar_log = extract_solar(csv_file_one, len(demand_log), ac_power_name_one)
 
@@ -133,6 +44,7 @@ for subsec in range(0, len(demand_log)):
     leftover = demand_log[subsec] - solar_log[subsec]
     headroom = grid_cap_w - leftover
 
+    #Branch 1: Solar is less than the demand
     if leftover > 0 and demand_log[subsec] > baseline_demand_w:
 
         #Split Leftover into battery
@@ -213,6 +125,7 @@ for subsec in range(0, len(demand_log)):
         solar_used_log.append(solar_log[subsec])
         timestamp_log.append(subsec)
 
+    #Branch 2: Demand is low 
     elif leftover > 0 and demand_log[subsec] <= baseline_demand_w:
         #No leftover, no battery
         battery_output = 0
@@ -257,6 +170,8 @@ for subsec in range(0, len(demand_log)):
         #Update remaining logs
         unmet_demand_log.append(0)
         timestamp_log.append(subsec)
+
+    #Branch 3: Solar is greater than the demand
     elif leftover <= 0:
         #No leftover, no battery or grid output
         battery_output = 0
@@ -323,6 +238,6 @@ print("Reduction:", round(100*(1 - grid_ramp_mean/no_batt_ramp), 1), "%")
 
 
 plt.plot(demand_log[:10000], label="Demand")
-plt.plot(grid_output_log[:1000], label="Grid output")
-plt.plot(battery_output_log[:1000], label="Battery output")
+plt.plot(grid_output_log[:10000], label="Grid output")
+plt.plot(battery_output_log[:10000], label="Battery output")
 plt.xlabel("Step"); plt.ylabel("Power (W)"); plt.legend(); plt.show()
